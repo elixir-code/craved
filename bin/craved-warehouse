@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+
+import sys, os
+
+def main():
+
+	print("running script craved-warehouse")
+
+	try:
+		import craved
+
+	except ImportError:
+		print("\nwarning : 'craved' package could not be found !\n"
+			"install 'craved' from PyPI and proceed ...")
+		return 1
+
+	#check if the current directory is empty
+	if(os.listdir() != []):
+		print("\nwarning : The 'current directory' is not empty !\n"
+			"run the script in an empty directory ...")
+		return 1
+
+	print("warning: existing 'craved-warehouse' configuration (if any) will be lost\n"
+		"Do you want to proceed (Y/n): ",end='')
+
+	response_confirm = input().strip() in ['Y','y']
+
+	#if user didn't respond with yes
+	if(not response_confirm):
+		print("\naborting script 'craved-warehouse'")
+		return 0
+	
+	current_dir = os.getcwd() + "/"
+	
+	print("creating necessary sub-directories and files")
+
+	#setup the directory structure
+	try:
+		print("creating HOOD/")
+		os.mkdir("HOOD")
+
+		print("creating BAGS/")
+		os.mkdir("BAGS")
+
+		print("creating results.csv")
+
+		#TODO: Index indices with names
+		with open("results.csv","w") as results_file:
+
+			print("writing results.csv")
+
+			results_file.write("\"bag name\",")
+			results_file.write("algorithm,")
+
+			for i in range(15):
+				results_file.write('\"Internal {}\",'.format(i+1))
+
+			for i in range(15):
+				results_file.write('\"External {}\",'.format(i+1))
+
+			results_file.write("\n")
+
+	except OSError as err:
+		print("\n{0}".format(err))
+		print("\nfailed to create craved-warehouse sub-directories and files")
+		return 1
+
+	#write the path of <CRAVED HOME DIRECTORY> to config file
+	craved_dir = craved.__path__
+
+	# has zero or more than one path where package is stored
+	if(len(craved_dir) != 1):
+		print("\nfailed to resolve 'craved' package path")
+		return 1
+
+	craved_config_file = craved_dir[0] + "/craved_warehouse.dat"
+	
+	try:
+		with open(craved_config_file,"w") as config_file:
+			print("writing craved-warehouse details to configuration file")
+			config_file.write(current_dir)
+	
+	except:
+		print("\nfailed to write craved-warehouse details to configuration file")
+		return 1
+
+	print("\nsuccessfully setup craved-warehouse")
+
+	return 0
+
+if __name__ == '__main__':
+	sys.exit(main())
