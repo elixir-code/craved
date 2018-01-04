@@ -198,79 +198,472 @@ class eda:
 			`Loading from External datasets <http://scikit-learn.org/stable/datasets/#loading-from-external-datasets>`_
 	"""
 
-	def read_data_csv(self, file, sep=',', skiprows=None, header_row=None, usecols=None, target_col=-1, nrows=None, encode_target=True, **kargs):
+	def read_data_csv(self, file, sep=',', skiprows=None, header_row=None, usecols=None, target_col=-1, encode_target=True, categorical_cols='infer', na_values=None, nrows=None, **kargs):
 		"""Read data from CSV format file
 		
 		Parameters:
-			file (str or open file): path to the CSV data file or URL (http, ftp, S3 location) or ``open file`` object
-			sep (str, default=','): Column delimiter (None: autodetect delimiter, '\s+': combination of spaces and tabs, Regular expressions)
+			file (str or open file): path to the CSV data file or URL (http, ftp, S3 location) or ``open file`` object.
+			sep (str, default=','): Column delimiter. Accepted values: ``None`` implies autodetect delimiter, '\s+' uses combination of spaces and tabs, Regular expressions
 			
-			skiprows (:obj:`list` or int, default= ``None``): 'List' (list) of line indices to skip or 'Number' (int) of starting lines to skip
-			header_row (int, default=``None``): Relative Zero-Index (after skipping rows) of the row containing column names. Note: All preceding rows are ignored. (``None``: No header row)
+			skiprows (:obj:`list` or int, default= ``None``): 'List' (list) of line indices to skip or 'Number' (int) of starting lines to skip.
+			header_row (int, default=``None``): Relative Zero-Index (index of rows after skipping rows using ``skiprows`` parameter) of the row containing column names. Note: All preceding rows are ignored.
 			
-			usecols (:obj:`list`, default=  ``None``): List of column ``names`` or ``indices`` to consider (None: Use all columns)
-			target_col (int, default=``-1``): Relative Zero-Index (after choosing columns) of column to use as target values (``None``: No target value columns, ``-1``: Last column, ``0``:First column)
+			usecols (:obj:`list`, default=  ``None``): List of column 'names' (or 'indices', if no column names) to consider. ``None`` indicates use of all columns.
+			target_col (int, default=``-1``): Relative Zero-Index of column (after filtering columns using ``usecols`` parameter) to use as target values. ``None`` indicates absence of target value columns.
 			
-			nrows (int, default= ``None``): Number of rows of data to read (``None``: all available)
+			encode_target (bool, default=True): Encode target values
+			categorical_cols (:obj:`list`, str, int, default='infer'): List (str or int if singleton) of column 'names' (or absolute 'indices', if no column names) of categorical columns to encode. ``categorical_cols='infer'`` autodetects nominal categorical columns.
 			
-			**kargs: 	Keyword arguments accepted by :func:`pandas.read_csv` (Keyword Arguments : na_values, comment, lineterminator, ...)
-						Reference : ` :func:`pandas.read_csv` <https://pandas.pydata.org/pandas-docs/stable/generated/pandas.read_csv.html>`_
+			na_values (scalar, str, list-like, or dict, default=``None``): Additional strings to recognize as NA/NaN. If dict passed, specific per-column NA values. By default the following values are interpreted as NaN: ‘’, ‘#N/A’, ‘#N/A N/A’, ‘#NA’, ‘-1.#IND’, ‘-1.#QNAN’, ‘-NaN’, ‘-nan’, ‘1.#IND’, ‘1.#QNAN’, ‘N/A’, ‘NA’, ‘NULL’, ‘NaN’, ‘n/a’, ‘nan’, ‘null’.
+			nrows (int, default=``None``): Number of rows of data to read. `None`` implies all available rows.
 			
+			**kargs: 	Other keyword arguments accepted by :func:`pandas.read_csv` (Keyword Arguments: comment, lineterminator, ...)
+
+		Notes:
+			* ``skiprows`` parameter uses absolute row indices whereas ``header_row`` parameter uses relative index (i.e., zero-index after removing rows specied by ``skiprows`` parameter).
+			* ``usecols`` and ``categorical_cols`` parameters use absolute column 'names' (or 'indices' if no 'names') whereas ``target_cols`` parameter uses relative column 'indices' (or 'names') after filtering out columns specified by ``usecols`` parameter.
+			* ``categorical_cols='infer'`` identifies and encodes nominal features (i.e., features of 'string' type, with fewer unique entries than a value heuristically determined from number of data samples) and drops other 'string' and 'date' type features.
+				use func:`craved.eda.max_classes_nominal` to find the heuristically determined value of maximum number of distinct entries in nominal features for given number of samples
+			* Data samples with any NA/NaN features are implicitly dropped.
+
 		Examples:
-			Illustration of **Reading from CSV data file**
+			Illustration of **Reading from CSV data file** ::
+			
+			>>> from craved import eda
+			>>> main = eda.eda()
+
+			>>> from io import StringIO
+			
+			>>> data = 	'''Dataset: Abalone
+			...	Source: UCI ML Repository
+			...	
+			...	skips rows until this, i.e., skiprows = 4. Header row follows immediately, i.e., header_row = 0.
+			...	Sex, Length, Diameter, Height, Whole weight, Shucked weight, Viscera weight, Shell weight, Rings
+			...	M,0.455,0.365,0.095,0.514,0.2245,0.101,0.15,15
+			...	M,0.35,0.265,0.09,0.2255,0.0995,0.0485,0.07,7
+			...	F,0.53,0.42,0.135,0.677,0.2565,0.1415,0.21,9
+			...	M,0.44,0.365,0.125,0.516,0.2155,0.114,0.155,10
+			... I,0.33,0.255,0.08,0.205,0.0895,0.0395,0.055,7
+			... I,0.425,0.3,0.095,0.3515,0.141,0.0775,0.12,8
+			...	F,0.53,0.415,0.15,0.7775,0.237,0.1415,0.33,20
+			...	F,0.545,0.425,0.125,0.768,0.294,0.1495,0.26,16
+			...	M,0.475,0.37,0.125,0.5095,0.2165,0.1125,0.165,9
+			...	F,0.55,0.44,0.15,0.8945,0.3145,0.151,0.32,19
+			...	'''
+
+			>>> # use columns ['Sex', 'Length', 'Diameter', 'Height', 'Rings']. 'Ring' is the target to predict (i.e., target_col=-1).
+			>>> main.read_data_csv(StringIO(data), sep=',', skiprows=4, header_row=0, usecols=['Sex', 'Length', 'Diameter', 'Height', 'Rings'], target_col=-1, encode_target=False)
+			
+			>>> # Print the processed data samples. Note: 'Sex' column has been encoded.
+			... print(main.data)
+			[[ 2.     0.455  0.365  0.095]
+			 [ 2.     0.35   0.265  0.09 ]
+			 [ 0.     0.53   0.42   0.135]
+			 [ 2.     0.44   0.365  0.125]
+			 [ 1.     0.33   0.255  0.08 ]
+			 [ 1.     0.425  0.3    0.095]
+			 [ 0.     0.53   0.415  0.15 ]
+			 [ 0.     0.545  0.425  0.125]
+			 [ 2.     0.475  0.37   0.125]
+			 [ 0.     0.55   0.44   0.15 ]]
+
+			>>> # Print the names of columns in data
+			... print(main.columns_)
+			Index(['Sex', 'Length', 'Diameter', 'Height'], dtype='object')
+			
+			>>> # Print the target values, i.e, 'Rings' values.
+			... print(main.target)
+			[15  7  9 10  7  8 20 16  9 19]
+
+
+			::
+			
+			>>> from craved import eda
+			>>> main = eda.eda()
+
+			>>> from io import StringIO
+			
+			>>> # First 10 samples from Dataset : Mushroom (UCI ML Repository). A string type feature was intentionally introduced as Column '0'.
+			>>> data = 	'''
+			...	sample1     p x s n t p f c n k e e s s w w p w o p k s u
+			...	sample2     e x s y t a f c b k e c s s w w p w o p n n g
+			...	sample3     e b s w t l f c b n e c s s w w p w o p n n m
+			... sample4     p x y w t p f c n n e e s s w w p w o p k s u
+			...	sample5     e x s g f n f w b k t e s s w w p w o e n a g
+			...	sample6     e x y y t a f c b n e c s s w w p w o p k n g
+			...	sample7     e b s w t a f c b g e c s s w w p w o p k n m
+			...	sample8     e b y w t l f c b n e c s s w w p w o p n s m
+			...	sample9     p x y w t p f c n p e e s s w w p w o p k v g
+			...	sample10    e b s y t a f c b g e c s s w w p w o p k s m
+			...	'''
+			
+			>>> # Column delimiter is spaces or tabs, i.e., sep='\s+'
+			... # No header rows available, i.e., header_row=None (default).
+			... # Use all columns, i.e., usecols=None (default).
+			... # Column '1' contains target values. Encode the target values, i.e., encode_target=True (default).
+			... main.read_data_csv(StringIO(data), sep='\s+', header_row=None, target_col=1)
+			info: columns  [0] was/were inferred as 'string' or 'date' type feature(s) and dropped
+
+			>>> #Print the processed data samples. Note: Column '0' was inferred as 'string' type feature and dropped.
+			... print(main.data)
+			[[ 1.  0.  1.  1.  3.  0.  0.  1.  1.  0.  1.  0.  0.  0.  0.  0.  0.  0.	1.  0.  2.  2.]
+			 [ 1.  0.  3.  1.  0.  0.  0.  0.  1.  0.  0.  0.  0.  0.  0.  0.  0.  0.   1.  1.  1.  0.]
+			 [ 0.  0.  2.  1.  1.  0.  0.  0.  2.  0.  0.  0.  0.  0.  0.  0.  0.  0.   1.  1.  1.  1.]
+			 [ 1.  1.  2.  1.  3.  0.  0.  1.  2.  0.  1.  0.  0.  0.  0.  0.  0.  0.   1.  0.  2.  2.]
+			 [ 1.  0.  0.  0.  2.  0.  1.  0.  1.  1.  1.  0.  0.  0.  0.  0.  0.  0.   0.  1.  0.  0.]
+			 [ 1.  1.  3.  1.  0.  0.  0.  0.  2.  0.  0.  0.  0.  0.  0.  0.  0.  0.   1.  0.  1.  0.]
+			 [ 0.  0.  2.  1.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.   1.  0.  1.  1.]
+			 [ 0.  1.  2.  1.  1.  0.  0.  0.  2.  0.  0.  0.  0.  0.  0.  0.  0.  0.   1.  1.  2.  1.]
+			 [ 1.  1.  2.  1.  3.  0.  0.  1.  3.  0.  1.  0.  0.  0.  0.  0.  0.  0.   1.  0.  3.  0.]
+			 [ 0.  0.  3.  1.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.   1.  0.  2.  1.]]
+
+	    	>>> # Print the names of columns in data
+			... print(main.columns_)
+			Int64Index([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,	21, 22, 23], dtype='int64')
+
+			>>> # Print the target values, i.e, Column '1' values.
+			... print(main.target)
+			[1, 0, 0, 1, 0, 0, 0, 0, 1, 0]
+
+			>>> # Print the distinct (original) classes in target values
+			... print(main.classes_)
+			['e', 'p']
 		"""
-		dataset = pd.read_csv(filepath_or_buffer=file, sep=sep, skiprows=skiprows, header=header_row, usecols=usecols, index_col=target_col, skipinitialspace=True, nrows=nrows, verbose=True, **kargs)
-		self.data, self.target = dataset.values, None if target_col is None else np.array(dataset.index)
+		dataset = pd.read_csv(filepath_or_buffer=file, sep=sep, skiprows=skiprows, header=header_row, usecols=usecols, index_col=target_col, na_values=na_values, skipinitialspace=True, nrows=nrows, **kargs)
+		dataset.dropna(axis='index', how='any', inplace=True)
 
-		if self.target is not None and encode_target:
+		# column index (or names) in data
+		self.columns_ = dataset.columns
+		columns_dtypes = dataset.dtypes.values
+
+		data, target = dataset.values, None if target_col is None else np.array(dataset.index)
+
+		if target is not None and encode_target:
 			target_labelEncoder = LabelEncoder()
-			self.target = target_labelEncoder.fit_transform(self.target)
-			self.classes_ = list(target_labelEncoder.classes_)
+			target = target_labelEncoder.fit_transform(target)
+			self.classes_ = target_labelEncoder.classes_.tolist()
+
+		# using array of absolute (zero-)indices of columns for ``catergorical_cols`` parameter
+		if isinstance(categorical_cols, str) and categorical_cols.casefold()=="infer":
+
+			n_samples, n_features = data.shape
+			selected_columns = np.array([True]*n_features)
+
+			# maximum number of classes in a column to be "infered" as "categorical"
+			max_infer_nominal_classes = max_classes_nominal(n_samples)
+
+			self._nominal_columns = []
+
+			for column_index in np.where(columns_dtypes==np.object)[0]:
+
+				column_labelEncoder = LabelEncoder()
+				column_labelEncoder.fit(data.T[column_index])
+
+				if len(column_labelEncoder.classes_) <= max_infer_nominal_classes:
+					self._nominal_columns.append(self.columns_[column_index])
+					data.T[column_index] = column_labelEncoder.transform(data.T[column_index])
+
+				else:
+					selected_columns[column_index] = False
+
+				del column_labelEncoder
+
+			if not selected_columns.all():
+				print("info: columns ",self.columns_[np.where(selected_columns==False)].tolist(),"was/were inferred as 'string' or 'date' type feature(s) and dropped")
+
+			self.columns_ = self.columns_[selected_columns]
+			data = data.T[selected_columns].T
+
+		elif isinstance(categorical_cols, list) or isinstance(categorical_cols, int) or isinstance(categorical_cols, str):
+
+			if isinstance(categorical_cols, int) or isinstance(categorical_cols, str):
+				categorical_cols = [categorical_cols]
+
+			self._nominal_columns = categorical_cols
+
+			for column_name in categorical_cols:	
+				
+				column_index, = np.where(self.columns_==column_name)
+				
+				if column_index.shape == (1,):
+					column_labelEncoder = LabelEncoder()
+					data.T[column_index[0]] = column_labelEncoder.fit_transform(data.T[column_index[0]])
+					del column_labelEncoder
+
+				else:
+					print("warning: column '{0}' could not be (uniquely) identified and was skipped".format(column_name))
+					continue
+
+		try:
+			data = data.astype(np.number)
+
+		except ValueError as err:
+			print("warning: Data cointains 'string' (or 'date') type features and could not be casted to 'numerical' type")
+
+		self.data, self.target = data, target
 
 
-
-	def read_data_libsvm(self, file, , n_features=None, **kargs):
+	def read_data_libsvm(self, file, type='classification', dtype=np.float, n_features=None, **kargs):
 		"""Read data from LIBSVM format file
 
 		Parameters:
-			file (str or open file): path to LIBSVM data file or ``open file`` object or file descriptor
-			n_features (int, default= ``None``): number of features to use (``None``: infer from data)
+			file (str or open file or int): Path to LIBSVM data file or ``open file`` object or file descriptor
+			type ({'classification','regression','ranking'}, default='classification'): Type of dataset
+			dtype (datatypes, default=``np.float``): Datatype of data array
+			n_features (int, default= ``None``): Number of features to use. ``None`` implies infer from data.
 
-			**kargs: 	Keyword arguments accepted by :func:`sklearn.datasets.load_svmlight_file` (Keyword arguments : offset, length, multilabel ...)
-						Reference : ` :func:`sklearn.datasets.load_svmlight_file` <http://scikit-learn.org/stable/modules/generated/sklearn.datasets.load_svmlight_file.html>`_
+			**kargs: 	Other Keyword arguments accepted by :func:`sklearn.datasets.load_svmlight_file` (Keyword arguments : offset, length, multilabel ...)
+		
 		Notes:
-			``file-like`` objects passed to 'file' parameter must be opened in binary mode.
+			* ``file-like`` objects passed to 'file' parameter must be opened in binary mode.
+			* Learning to Rank('ranking' type) datasets are not currently supported
+			* ``dtype`` parameter accepts only numerical datatypes
+			* The LIBSVM data file is assumed to have been preprocessed, i.e., encoding categorical features and removal of missing values.
+
+		Examples:
+			Illustration of **Reading from LIBSVM data file** ::
+
+			>>> from craved import eda
+			>>> main = eda.eda()
+
+			>>> from io import BytesIO
+
+			>>> # First 10 samples from dataset Breast Cancer (Source: https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/breast-cancer)
+			... data = b'''
+			... 2.000000  1:1000025.000000 2:5.000000 3:1.000000 4:1.000000 5:1.000000 6:2.000000 7:1.000000 8:3.000000 9:1.000000 10:1.000000
+			...	2.000000  1:1002945.000000 2:5.000000 3:4.000000 4:4.000000 5:5.000000 6:7.000000 7:10.000000 8:3.000000 9:2.000000 10:1.000000
+			...	2.000000  1:1015425.000000 2:3.000000 3:1.000000 4:1.000000 5:1.000000 6:2.000000 7:2.000000 8:3.000000 9:1.000000 10:1.000000
+			...	2.000000  1:1016277.000000 2:6.000000 3:8.000000 4:8.000000 5:1.000000 6:3.000000 7:4.000000 8:3.000000 9:7.000000 10:1.000000
+			...	2.000000  1:1017023.000000 2:4.000000 3:1.000000 4:1.000000 5:3.000000 6:2.000000 7:1.000000 8:3.000000 9:1.000000 10:1.000000
+			...	4.000000  1:1017122.000000 2:8.000000 3:10.000000 4:10.000000 5:8.000000 6:7.000000 7:10.000000 8:9.000000 9:7.000000 10:1.000000
+			...	2.000000  1:1018099.000000 2:1.000000 3:1.000000 4:1.000000 5:1.000000 6:2.000000 7:10.000000 8:3.000000 9:1.000000 10:1.000000
+			...	2.000000  1:1018561.000000 2:2.000000 3:1.000000 4:2.000000 5:1.000000 6:2.000000 7:1.000000 8:3.000000 9:1.000000 10:1.000000
+			...	2.000000  1:1033078.000000 2:2.000000 3:1.000000 4:1.000000 5:1.000000 6:2.000000 7:1.000000 8:1.000000 9:1.000000 10:5.000000
+			...	2.000000  1:1033078.000000 2:4.000000 3:2.000000 4:1.000000 5:1.000000 6:2.000000 7:1.000000 8:2.000000 9:1.000000 10:1.000000
+			...	'''
+			
+			>>> import numpy as np
+			>>> # Each row is an instance and takes the form **<target value> <feature index>:<feature value> ... **.
+			...	# Dataset is 'classification' type and target values (first column) represents class label of each sample, i.e., type='classification' (default)
+			...	# All features assume only integral values, i.e., dtype=np.int
+			...	main.read_data_libsvm(BytesIO(data), dtype=np.int)
+
+			>>> # Print the data samples
+			... print(main.data)
+			[[1000025       5       1       1       1       2       1       3       1       1]
+			 [1002945       5       4       4       5       7      10       3       2       1]
+			 [1015425       3       1       1       1       2       2       3       1       1]
+			 [1016277       6       8       8       1       3       4       3       7       1]
+			 [1017023       4       1       1       3       2       1       3       1       1]
+			 [1017122       8      10      10       8       7      10       9       7       1]
+			 [1018099       1       1       1       1       2      10       3       1       1]
+			 [1018561       2       1       2       1       2       1       3       1       1]
+			 [1033078       2       1       1       1       2       1       1       1       5]
+			 [1033078       4       2       1       1       2       1       2       1       1]]
+
+			>>> # Print indices of columns or features. Assumption: Feature indices always uses one-based index
+			...	print(main.columns_)
+			[ 1  2  3  4  5  6  7  8  9 10]
+
+			>>> # Print target values
+			... print(main.target)
+			[2 2 2 2 2 4 2 2 2 2]
+
+			>>> # Print the distinct classes in target values
+			...	print(main.classes_)
+			[2 4]
 		"""
-		dataset = load_svmlight_file(f=file, n_features=n_features, query_id=False, **kargs)
+		dataset = load_svmlight_file(f=file, dtype=dtype, n_features=n_features, query_id=False, **kargs)
 		data, target = dataset[0].toarray(), dataset[1]
 
-		#Encoding target values
-		#Encoding Categorical attributes
+		if type.casefold()=="classification":
+			target = target.astype(np.int)
 
-	def read_data_arff(self, file):
+		elif type.casefold()=="regression":
+			pass
+
+		elif type.casefold()=="ranking":
+			print("error: 'ranking' type datasets are not currently supported")
+			sys.exit(1)
+
+		n_features = data.shape[1]
+		self.columns_ = np.arange(1, n_features+1)
+		self.classes_ = np.unique(target)
+
+		self.data, self.target = data, target
+
+	# TODO: Allow use of subset of attributes
+	def read_data_arff(self, file, target_attr='class', encode_target='infer', num_categorical_attrs=None, drop_na_rows=True):
 		"""Read data from ARFF format file
 		
 		Parameters:
 			file (str or open file): path to ARFF data file or ``open file`` object
+			
+			target_attr (str, default='class'): attribute name of the target column. ``target_attr=None``implies no target columns.
+			encode_target (bool, default-'infer'): Encode target values. ``encode_target='infer'`` encodes nominal target and ignores numeric target attributes.
 
-		Reference:
-			` :func:`scipy.io.arff.loadarff` <https://docs.scipy.org/doc/scipy-0.19.1/reference/generated/scipy.io.arff.loadarff.html>`_
+			num_categorical_attrs (:obj:`list`, default= ``None``): List of 'names' of numeric attributes to be inferred as nominal and to be encoded. Note: All nominal attributes are implicitly encoded.
+			drop_na_rows (bool, detault=True): Drop data samples with NA/NaN ('?') features
+		
+		Notes:
+			* All nominal type attributes are implicitly encoded.
+
+		Examples:
+			Illustration of **Reading from ARFF data file** ::
+
+			>>> from craved import eda
+			>>> main = eda.eda()
+
+			>>> from io import StringIO
+			
+			>>> # An excerpt from dataset 'Hepatitis' involving features 'Age', 'Sex', 'Steroid', Albumin', 'Protime' and 'Class'.
+			>>> data = '''
+			...	% Dataset: Hepatitis (Source: Weka)
+			... @relation hepatitis
+			...	
+			...	@attribute Age integer
+			...	@attribute Sex {male, female}
+			...	@attribute Steroid {no, yes}
+			...	@attribute Albumin real
+			...	@attribute Class {DIE, LIVE}
+			...
+			...	@data
+			...	30,male,no,4,LIVE
+			...	50,female,no,3.5,LIVE
+			...	78,female,yes,4,LIVE
+			...	31,female,?,4,LIVE
+			...	34,female,yes,4,LIVE
+			...	46,female,yes,3.3,DIE
+			...	44,female,yes,4.3,LIVE
+			...	61,female,no,4.1,LIVE
+			...	53,male,no,4.1,LIVE
+			...	43,female,yes,3.1,DIE
+			...	'''
+
+			>>> # The target is attribute 'Class', i.e., target_attr='Class'
+			...	# Data samples with any missing ('?') features should be dropped, i.e., drop_na_rows=True (default).
+			... main.read_data_arff(StringIO(data), target_attr='Class')
+			info: The dataset may contain attributes with N/A ('?') values
+
+			>>> # Print the processed data samples.
+			...	'''Note:	Nominal features ['Sex', 'Steroid'] have been implicitly encoded.
+			...				Samples with any missing value('?') features have been dropped'''
+			[[ 30.    1.    0.    4. ]
+			 [ 50.    0.    0.    3.5]
+			 [ 78.    0.    1.    4. ]
+			 [ 34.    0.    1.    4. ]
+			 [ 46.    0.    1.    3.3]
+			 [ 44.    0.    1.    4.3]
+			 [ 61.    0.    0.    4.1]
+			 [ 53.    1.    0.    4.1]
+			 [ 43.    0.    1.    3.1]]
+
+			>>> # Print the names of columns in data
+			... print(main.columns_)
+			['Age', 'Sex', 'Steroid', 'Albumin']
+
+			>>> # Print the target values. Note: Target attribute 'Class' has been encoded.
+			...	print(main.target)
+			[1 1 1 1 0 1 1 1 0]
+
+			>>> # Print the distinct (original) classes in target values
+			... print(main.classes_)
+			['DIE', 'LIVE']
 		"""
 		dataset, metadata = loadarff(f=file)
 
-	#Dummy coding (alias, One-Hot Encoding) of categorical attributes
-	def dummy_coding(self, columns=None, retain_original=False):
+		rows_without_na = np.ones(dataset.shape[0], dtype=np.bool)
+			
+		for attribute in metadata:	
+			if metadata[attribute][0] == 'nominal':
+				rows_without_na[np.where(dataset[attribute] == b'?')] = False
+
+			if metadata[attribute][0] == 'numeric':
+				rows_without_na[np.isnan(dataset[attribute])] = False
 		
-		if retain_original:
-			self.data_original = self.data.copy()
+		if not rows_without_na.all():
+			print("info: The dataset may contain attributes with N/A ('?') values")
 
-		if columns is None:
-			print("Since columns=None, All attributes will be dummy coded ...")
+		if drop_na_rows:
+			dataset = dataset[rows_without_na]
 
-		#convert data from np.ndarray to pd.DataFrame
-		self.data = pd.DataFrame(self.data)
-		self.data = pd.get_dummies(self.data,columns=columns).values
-		self.n_features = self.data.shape[1]
+		# if target_attr is None or target_attr in metadata:
+		# 	data_records, target = dataset[[attribute for attribute in metadata if attribute!=target_attr]], None if target_attr is None else dataset[target_attr]
+
+		if target_attr is None or target_attr in metadata:
+			self.columns_ = metadata.names().copy()
+			
+			if target_attr in metadata:
+				self.columns_.remove(target_attr)
+
+			data_records, target = dataset[self.columns_], None if target_attr is None else dataset[target_attr]			
+
+
+		else:
+			print("error: Unknown 'target' attribute name specified")
+			sys.exit(1)
+
+		# Processing target labels
+		if target_attr is not None:
+
+			# 'classification' type datasets
+			if metadata[target_attr][0]=='nominal':
+				if isinstance(encode_target, str) and encode_target.casefold()=='infer':
+					encode_target = True
+
+			# 'regression' type datasets
+			elif metadata[target_attr][0]=='numeric':
+				target = target.astype(np.number)
+				if isinstance(encode_target, str) and encode_target.casefold()=='infer':
+					encode_target = False
+
+			if encode_target:
+				target_labelEncoder = LabelEncoder()
+				target = target_labelEncoder.fit_transform(target)
+				self.classes_ = [target_class.decode() for target_class in target_labelEncoder.classes_.tolist()]
+				#self.classes_ = target_labelEncoder.classes_.tolist()
+		
+		# Form a new data array
+		data = np.empty( ( data_records.size, len(data_records.dtype.names) ), dtype=np.float64)
+
+		for index, attribute in enumerate(data_records.dtype.names):
+
+			attribute_values = data_records[attribute]
+			encode_attribute = False
+
+			if metadata[attribute][0] == 'numeric':
+
+				if num_categorical_attrs is not None and attribute in num_categorical_attrs:
+					encode_attribute = True
+
+			elif metadata[attribute][0] == 'nominal':
+				encode_attribute = True
+
+			if encode_attribute:
+				attr_labelEncoder = LabelEncoder()
+				attribute_values = attr_labelEncoder.fit_transform(attribute_values)
+				del attr_labelEncoder
+
+			data.T[index] = attribute_values
+		
+		self.data, self.target = data, target
+
+
+	def dummy_coding(self, columns=None, retain_original=False):
+		"""Dummy coding (One-Hot Encoding) of nominal categorical features
+		
+		Parameters:
+
+		"""
+
+		try:
+			dataframe = pd.DataFrame(self.data, columns=self.columns_, dtype=np.number)
+
+		except ValueError:
+			print("warning: Data contains non-numeric features")
+			dataframe = pd.DataFrame(self.data, columns=self.columns_)
+
+		
 
 	def sample_data(self,size=None,filename=None):
 		#default size of bag is 10% of sample
@@ -686,3 +1079,21 @@ def flatten_list(data):
 		flattened_list = flattened_list + flatten_list(element)
 
 	return flattened_list
+
+# max number of classes in a nominal variables for dataset with ``n_samples`` data points
+def max_classes_nominal(n_samples):
+
+	from math import ceil
+	
+	# Result of quadratic regression on "n_samples" -> "max classes in nominal columns"
+	reg_coefs = np.array([  8.54480458e-03,   1.31494511e-08])
+	reg_intercept = 14.017948334463796
+	
+	if n_samples <= 16:
+		return ceil(n_samples/3)
+	
+	elif n_samples <= 100000:
+		return ceil( min(np.sum([n_samples, n_samples*n_samples]*reg_coefs) + reg_intercept, n_samples/4) )
+	
+	else:
+		return  n_samples/100
