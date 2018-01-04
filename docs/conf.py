@@ -33,7 +33,8 @@
 # ones.
 
 import sys
-sys.path.append('/home/mukesh/Documents/myPackage/craved')
+import os
+sys.path.insert(0, os.path.abspath('../'))
 
 extensions = ['sphinx.ext.autodoc','sphinx.ext.napoleon','sphinx.ext.todo']
 
