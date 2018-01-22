@@ -31,8 +31,7 @@ from sklearn.cluster import SpectralClustering
 from sklearn.cluster import AgglomerativeClustering
 from math import pow,floor,ceil
 
-#gap source code shipped with 'craved' package
-import gap
+from . import gap
 
 import pandas as pd
 from sklearn.datasets import load_svmlight_file
@@ -125,7 +124,7 @@ class eda:
 			* Complex 'multi-dimensional' features of data samples are implicitly flattened by default.
 			* Column indices (or names) of the features are zero-indexed.
 
-		Example:
+		Examples:
 
 			Illustration of implicit flattening of multi-dimensional features::
 			
@@ -190,9 +189,18 @@ class eda:
 				else:
 					raise UserWarning("number of 'target' values doesn't match number of samples in data")
 
-			except Exception as err:
-				print('{0}\ninvalid target array supplied'.format(err))
+				if len(self.target.shape)>1:
+					raise UserWarning("'target' values form a multi-dimensional array (but one-dimensional array expected).")
 
+			except Exception as err:
+				print('{0}\nerror: invalid target array supplied'.format(err))
+				sys.exit(1)
+
+			self.classes_ = None
+
+			classes_ = np.unique(self.target)
+			if classes_.shape[0] <= max_classes_nominal(self.n_samples):
+				self.classes_ = classes_
 
 	"""Reading datasets from standard file formats (Supported File Formats : csv, libsvm, arff)
 	
@@ -516,8 +524,11 @@ class eda:
 
 		del dataset
 
+		self.classes_ = None
+
 		if type.casefold()=="classification":
 			target = target.astype(np.int)
+			self.classes_ = np.unique(target)
 
 		elif type.casefold()=="regression":
 			pass
@@ -528,7 +539,6 @@ class eda:
 
 		n_features = data.shape[1]
 		self.columns_ = np.arange(1, n_features+1)
-		self.classes_ = np.unique(target)
 
 		self._nominal_columns = None
 
@@ -650,6 +660,8 @@ class eda:
 		# Processing target labels
 		if target_attr is not None:
 
+			self.classes_ = None
+
 			# 'classification' type datasets
 			if metadata[target_attr][0]=='nominal':
 				if isinstance(encode_target, str) and encode_target.casefold()=='infer':
@@ -709,7 +721,7 @@ class eda:
 		"""Dummy coding (One-Hot Encoding) of nominal categorical columns (features)
 		
 		Parameters:
-			nominal_columns (:obj:`list`, int, str, 'all', default='infer'): List (str or int if singleton) of column 'names' (or absolute 'indices', if no column names) of nominal categorical columns to dummy code. ``nominal_columns='infer'`` autodetects nominal categorical columns. ``categorical_cols='all'`` implies all columns are nominal categorical. ``categorical_cols=None`` implies no nominal categorical columns.
+			nominal_columns (:obj:`list`, int, str, 'all', default='infer'): List (str or int if singleton) of column 'names' (or absolute 'indices', if no column names) of nominal categorical columns to dummy code. ``nominal_columns='infer'`` autodetects nominal categorical columns. ``nominal_columns='all'`` implies all columns are nominal categorical. ``nominal_columns=None`` implies no nominal categorical columns.
 			drop_first (bool, default=False): Whether to get k-1 dummies out of k categorical levels by removing the first level.
 		
 		Note:
@@ -1085,288 +1097,227 @@ class eda:
 
 		pickle.dump(metadata, open("metadata.p", "xb"))
 
-	#find no. of clusters - gap statistics
-	def gap_statistics(self,k_max,k_min=1):
-		"""Library used : gapkmeans (downloaded source : https://github.com/minddrummer/gap)
-		GAP_STATISTICS : Correctness to be checked ...
-		"""
-		#refs=None, B=10
-		gaps,sk,K = gap.gap.gap_statistic(self.data,refs=None,B=10,K=range(k_min,k_max+1),N_init = 10)
+
+	def perform_kmeans(self, n_clusters='gap', **kargs):
+		"""Perform K-Means Clustering on the data
+
+		n_clusters ({int, 'gap', 'n_classes'}, default='gap'): number (``int``) of clusters in the data. ``gap`` implies estimate the optimal number of clusters from data using Gap Statistics. ``n_classes`` implies uses number of classes in data as number of clusters.
+		**kargs: Other Keyword arguments (parameters) accepted by object :`sklearn.cluster.KMeans` constructor (Keyword Arguments: n_init, max_iter, verbose, n_jobs).
 		
-		plt.title("GAP STATISTICS")
-		plt.xlabel("n_clusters")
-		plt.ylabel("gap")
+		Note:
+			'Gap Statistics' may produce inconsistent K (optimal number of cluster) estimation across trials for datasets without clear distinct isotropic gaussian blob clusters.
+		
+		See also:
+			* The method :func:`craved.eda.perform_kmeans` is built upon `scikit-learn's KMeans Clustering API`_ (:obj:`sklearn.cluster.KMeans`).
+			* The Data Science Lab : `Finding the K in K-Means Clustering`_  (Gap Statistics)
 
-		plt.plot(K,gaps,"k",linewidth=2)
-		plt.show()
+		Examples:
+			Illustration of performing KMeans Clustering on synthetic dataset::
 
-	#computes euclidean distance matrix (for all pairs of data points)
-	def comp_distance_matrix(self,metric='euclidean',params={}):
-		"""TODO : Metrics to be supported:
-		sklearn native : ['cityblock', 'cosine', 'euclidean', 'l1', 'l2','manhattan']
-		scipy.spatial distances : ['braycurtis', 'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis',
-        'matching', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean',' sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']
+			>>> from craved import eda
+			>>> main = eda.eda()
+
+			>>> # Generate synthetic dataset (with istropic gaussian blobs clusters) using :func:`sklearn.datasets.make_blobs`
+			... from sklearn.datasets import make_blobs
+			>>> data, target = make_blobs(n_samples=100, n_features=2, centers=3)
+
+			>>> # Load the synthetic dataset into the eda object :obj:`main`
+			...	main.load_data(data, target)
+
+			>>> # Perform K-Means Clustering on the data
+			... main.perform_kmeans(n_clusters='gap')
+			info: Data implicilty Standardized (aka Z-Score Normalised) for K-Means Clustering
+			< ... some gap statistics (optimal n_clusters estimation) info goes here ... >
+			info: Optimal number of clusters in data, K=3 (as inferred using gap statistics)
+
+			inertia : 8.030120482
+			clusters : {0: 33, 1: 34, 2: 33}
+			parameters : {'verbose': 0, 'precompute_distances': 'auto', 'init': 'k-means++', 'tol': 0.0001, 'n_jobs': 1, 'random_state': None, 'max_iter': 300, 'n_init': 10, 'algorithm': 'auto', 'copy_x': True, 'n_clusters': 3}
+			n_clusters : 3
+			cluster_centers : [[ 0.54512904 -1.38171852]
+			 [-1.36053651  0.7996122 ]
+			 [ 0.85663585  0.55787564]]
+			labels : [1 0 0 2 1 2 0 1 1 2 2 2 1 1 1 0 0 1 2 0 0 0 1 0 2 2 1 1 2 2 1 0 1 0 2 0 0
+			 0 2 1 2 1 0 1 0 0 0 0 1 1 1 0 0 2 0 1 0 2 1 2 1 2 2 1 0 2 1 2 2 1 2 0 1 1
+			 2 0 0 2 0 2 1 0 0 2 2 2 0 0 1 1 2 2 1 1 0 1 2 1 2 2]
+
+			.. _`Finding the K in K-Means Clustering`: https://datasciencelab.wordpress.com/2013/12/27/finding-the-k-in-k-means-clustering/
+			 .. _`Scikit-Learn's KMeans Clustering API`: scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html
 		"""
-		if self.hdf5_file is None:
-			#if force_file is True and hdf5 file was successfully opened ...
-			self.distance_matrix=pairwise_distances(self.data,metric=metric,**params)
-			#raise MemoryError('Just Debugging ...')
+		
+		if not hasattr(self, 'standard_scaler'):
+			self.standardize_data()
+			print("info: Data implicilty Standardized (aka Z-Score Normalised) for K-Means Clustering")
 
+		if isinstance(n_clusters, int):
+			pass
+
+		# Estimate optimal 'number of clusters' (k) from data using gap statistics
+		elif isinstance(n_clusters, str) and n_clusters.casefold()=='gap':
+
+			kmin = 1
+			kmax = min(10, self.n_samples-1)
+			bestKValue = -1
+
+			# TODO: Handle boundary cases
+			while bestKValue < 0 and kmax>kmin:
+				bestKValue = gap_statistics(self.data, kmax=kmax, kmin=kmin, cluster_algorithm=KMeans, **kargs)
+				
+				kmin = kmax+1
+				kmax += min(10, (self.n_samples-1) - kmax)
+
+			if bestKValue < 0:
+				print("error: Gap statistics couldn't estimate the optimal number of clusters in data")
+				sys.exit(1)
+
+			n_clusters = bestKValue
+			print("info: Optimal number of clusters in data, K=%d (as inferred using gap statistics)"%n_clusters)
+
+		# 'number of clusters' to find = 'number of classes' in the labelled dataset
+		elif isinstance(n_clusters, str) and n_clusters.casefold()=='n_classes':
+			if target is not None:
+				if hasattr(self, 'classes_') and self.classes_ is not None:
+					n_clusters, = self.classes_.shape
+				else:
+					n_clusters, = np.unique(self.target).shape
+
+			else:
+				print("error: number of classes in data couldn't be determined due to absence of target class info.")
+				sys.exit(1)
+		
 		else:
-			print("\nForce File is enabled, using HDF5 for distance matrix ...")
+			print("error: invalid argument for parameter 'n_clusters'. Accepted arguments: {int, 'gap', 'n_classes'}")
+			sys.exit(1)
 
-			print("\nEnter 'r' to read distance matrix"
-				  "\nEnter 'w' to write distance matrix"
-				  "\nMode : ",end='')
-			mode=input().strip()
-
-			if mode == 'r':
-				self.distance_matrix = self.hdf5_file['distance_matrix']
-
-			elif mode == 'w':
-				if 'distance_matrix' in self.hdf5_file:
-					del self.hdf5_file['distance_matrix']
-
-				self.distance_matrix = self.hdf5_file.create_dataset("distance_matrix",(self.n_samples,self.n_samples),dtype='d')
-
-				for data_index,data_point in enumerate(self.data):
-					print(data_index)
-					self.distance_matrix[data_index] = pairwise_distances([data_point],self.data,metric=metric,**params)
-
-		#self.distance_matrix = np.zeros((self.n_samples,self.n_samples),dtype=np.float32)
-		#for data1_index,data2_index in combinations(range(self.n_samples),2):
-		#	self.distance_matrix[data1_index][data2_index] = self.distance_matrix[data2_index][data1_index] = euclidean_distance(self.data[data1_index],self.data[data2_index])
-
-	#TODO : arrange k-dist in increasing order and plot
-	#determines dbscan parameters
-	def det_dbscan_params(self,min_samples=None,plot_scale=0.02):
-		"""Heuristically determine min_sample and eps value for DBSCAN algorithm by visual inspection
-	
-		Keyword arguments --
-		min_samples - minimum number of points in a pts. esp neighbourhood to be called a core point
-		plot_scale - scale to compress the x-axis of plot (points v/s kdist plot)
-		
-		Note: Modified to work for large and small datasets
-		"""
-		if min_samples is None:
-			if 2*self.n_features <= self.n_samples:
-				min_samples=2*self.n_features
-			else:
-				raise Exception("please choose a value of min_samples <= no_samples")
-
-		kdist=np.empty(self.n_samples,dtype=np.float64)
-		data_index = 0
-
-		for src_distances in self.distance_matrix:
-			print(data_index)
-			'''
-			
-			kmin_distances=np.copy(src_distances[:min_samples])
-			kmin_sorted=np.sort(kmin_distances)
-			#print(kmin_distances.dtype,kmin_sorted.dtype)
-
-			del kmin_distances
-
-			#print(kmin_sorted)
-
-			for distance in src_distances[min_samples:]:
-				#print(distance)
-
-				if distance < kmin_sorted[min_samples-1]:
-					index=min_samples-2
-					while index>=0 :
-						if kmin_sorted[index] > distance :
-							kmin_sorted[index+1]=kmin_sorted[index]
-							index -= 1
-						else:
-							break
-
-					kmin_sorted[index+1]=distance
-
-				#print(kmin_sorted)
-			'''
-			#print(kmin_sorted,end="\n\n")
-			kmin_sorted = np.sort(src_distances)
-			kdist[data_index] = kmin_sorted[min_samples-1]
-			data_index += 1
-
-			del kmin_sorted
-		
-		del data_index
-		
-		#sort in order
-		kdist.sort()	
-		
-		#to avoid recomputation due to improper scale 
-		self.kdist=np.copy(kdist)	
-	
-		#plot point vs k-dist
-		plt.title("Finding DBSCAN parameters (min_samples, epsilon)")
-		plt.xlabel("Points ====>> ")
-		plt.ylabel("K-distance (k = "+str(min_samples)+")")
-		plt.grid(True)
-
-		x_points=np.arange(0.0,self.n_samples*plot_scale,plot_scale)
-		plt.plot(x_points,kdist,"k")
-		plt.show()
-
-		print("Enter estimated value of eps : ")
-		eps=float(input().strip())
-		
-		#f['dbscan_params'] = {'min_samples':min_samples,'eps':eps,'kdist':kdist}
-		self.dbscan_params={"min_samples":min_samples,"eps":eps}
-
-	def wk_inertia_stat(self,k_max,k_min=1,step=1):
-		"""Estimate number of clusters by ELBOW METHOD (Not Recommended)
-		
-		References: 	[1]	Estimating the number of clusters in a data set via the gap statistic
-					Tibshirani, Robert Walther, Guenther Hastie, Trevor
-			    	[2] 	'ClusterCrit' for R library Documentation
-		"""
-		Wk_array = np.empty( floor((k_max-k_min)/step)+1 , dtype=np.float64 )
-		inertia_array = np.empty( floor((k_max-k_min)/step)+1 , dtype=np.float64)
-
-		#run kmeans and compute log(wk) for all n_clusters
-		index = 0
-		for no_clusters in range(k_min,k_max+1,step):
-
-			kmeans_clusterer=KMeans(n_clusters=no_clusters)
-			kmeans_clusterer.fit(self.data)
-
-			Dr=np.zeros(no_clusters)
-			#unique,Nr=np.unique(kmeans_clusterer.labels_,return_counts=True)
-			#del unique
-
-			#TODO: ensure that no cluster has zero points
-			Nr = np.bincount(kmeans_clusterer.labels_)
-			'''
-			for i in range(self.n_samples-1):
-				for j in range(i+1,self.n_samples):
-					if kmeans_clusterer.labels_[i]==kmeans_clusterer.labels_[j]:
-						Dr[kmeans_clusterer.labels_[i]] += pow(self.distance_matrix[i][j],2)
-			'''
-			for data_index in range(self.n_samples):
-				data_cluster = kmeans_clusterer.labels_[data_index]
-				Dr[data_cluster] += euclidean_distance(self.data[data_index],kmeans_clusterer.cluster_centers_[data_cluster],squared=True) 
-
-			Wk=np.sum(Dr/2)
-			Wk_array[index]=Wk
-			inertia_array[index]=kmeans_clusterer.inertia_*100
-			index += 1
-
-			del kmeans_clusterer,Dr,Nr,Wk
-
-			print("completed for K=",no_clusters)
-
-		plt.title("Wk vs n_clusters")
-		plt.xlabel("n_clusters")
-		plt.ylabel("Wk")
-		plt.grid(True)
-
-		plt.plot(np.arange(k_min,k_max+1,step),-1*np.log(Wk_array),"k")
-		plt.show()
-
-		plt.title("INTERIA TO FIND NUMBER OF CLUSTERS")
-		plt.xlabel("n_clusters")
-		plt.ylabel("inertia")
-
-		plt.plot(np.arange(k_min,k_max+1,step),np.log(inertia_array),"k")
-		plt.show()
-
-	#gather results  by performing dbscan
-	def perform_dbscan(self):
-		'''
-		TODO : use ELKI's DBSCAN algorithm instead of scikit learns algorithm
-		Reference : https://stackoverflow.com/questions/16381577/scikit-learn-dbscan-memory-usage
-		'''
-		dbscan_clusterer=DBSCAN(**self.dbscan_params,metric="precomputed")
-		dbscan_clusterer.fit(self.distance_matrix,hdf5_file=self.hdf5_file)
-		self.dbscan_results={"parameters":dbscan_clusterer.get_params(),"labels":dbscan_clusterer.labels_,"n_clusters":np.unique(dbscan_clusterer.labels_).max()+1,'clusters':label_cnt_dict(dbscan_clusterer.labels_)}		
-
-		print_dict(self.dbscan_results)
-
-	def perform_hdbscan(self,min_cluster_size=15):
-		hdbscan_clusterer=HDBSCAN(min_cluster_size)#,metric="precomputed")
-		hdbscan_clusterer.fit(self.data)
-		self.hdbscan_results={"parameters":hdbscan_clusterer.get_params(),"labels":hdbscan_clusterer.labels_,"probabilities":hdbscan_clusterer.probabilities_,"n_clusters":np.unique(hdbscan_clusterer.labels_).max()+1,'clusters':label_cnt_dict(hdbscan_clusterer.labels_)}
-
-		print_dict(self.hdbscan_results)
-
-	#TODO : needs to be corrected
-	def perform_spectral_clustering(self, no_clusters, affinity='rbf', gamma=1.0, n_neighbors=10, pass_labels = False, n_init=10, force_manual=False):
-
-		if force_manual:
-			if not hasattr(self,"distance_matrix"):
-				self.comp_distance_matrix()
-
-			if affinity == 'rbf':
-				self.affinity_matrix = np.exp(-gamma * self.distance_matrix**2)
-
-			elif affinity == 'nearest_neighbors':
-				self.affinity_matrix = kneighbors_graph(self.data,n_neighbors=n_neighbors,include_self=True).toarray()
-
-
-			else:
-				raise Exception("Affinity is NOT recognised as VALID ...")
-
-			print("Computed Affinity Matrix ...")
-
-			#laplacian matrix of graph
-			lap, dd = laplacian(self.affinity_matrix, normed=True, return_diag=True)
-			lap *= -1
-			print("Computed Graph Laplacian ...")
-
-			lambdas, diffusion_map = np.linalg.eigh(lap)
-			print("Performed Eigen-decomposition ...")
-
-			embedding = diffusion_map.T[(self.n_samples-no_clusters):] * dd
-
-			#deterministic vector flip
-			sign = np.sign(embedding[range(embedding.shape[0]),np.argmax(np.abs(embedding),axis=1)])
-			embedding = embedding.T * sign
-
-			if no_clusters == 2:
-				visualise_2D(embedding.T[0],embedding.T[1],(self.class_labels) if pass_labels==True else None)
-			
-			elif no_clusters == 3:
-				visualise_3D(embedding.T[0],embedding.T[1],embedding.T[2],(self.class_labels) if pass_labels==True else None)
-
-			print("Performing K-Means clustering in eigen-space")
-			kmeans_clusterer = KMeans(n_clusters=no_clusters,n_jobs=-1)
-			kmeans_clusterer.fit(embedding)
-
-			spectral_params = {"affinity":affinity, "gamma":gamma, "n_neighbors":n_neighbors, "n_init":n_init}
-
-			self.spectral_results = {"parameters":spectral_params, "labels":kmeans_clusterer.labels_,"n_clusters":np.unique(kmeans_clusterer.labels_).max()+1,"clusters":label_cnt_dict(kmeans_clusterer.labels_)}
-
-
-		else: 
-			spectral_clusterer=SpectralClustering(n_clusters=no_clusters, gamma=gamma, affinity=affinity, n_neighbors=n_neighbors, n_init=n_init)
-			spectral_clusterer.fit(self.data,y=(self.class_labels if pass_labels is True else None))
-			self.spectral_results={"parameters":spectral_clusterer.get_params(),"labels":spectral_clusterer.labels_,"n_clusters":np.unique(spectral_clusterer.labels_).max()+1,"clusters":label_cnt_dict(spectral_clusterer.labels_)}
-
-		print_dict(self.spectral_results)
-
-		#gaussian kernel affinity matrix
-		#self.affinity_matrix = spectral_clusterer.affinity_matrix_
-
-	def perform_kmeans(self,no_clusters,params={'n_jobs':-1}):
-		#start_time = time()
-		kmeans_clusterer=KMeans(n_clusters=no_clusters,**params)
+		kmeans_clusterer = KMeans(n_clusters=n_clusters, **kargs)
 		kmeans_clusterer.fit(self.data)
-		#print("-- %s seconds --"%(time()-start_time))
-
-		self.kmeans_results={"parameters":kmeans_clusterer.get_params(),"labels":kmeans_clusterer.labels_,"n_clusters":no_clusters,'clusters':label_cnt_dict(kmeans_clusterer.labels_),"cluster_centers":kmeans_clusterer.cluster_centers_,"inertia":kmeans_clusterer.inertia_}     
+		
+		self.kmeans_results = {
+								"parameters":kmeans_clusterer.get_params(),
+								"labels":kmeans_clusterer.labels_,
+								"n_clusters":n_clusters,
+								'clusters':label_cnt_dict(kmeans_clusterer.labels_),
+								"cluster_centers":kmeans_clusterer.cluster_centers_,
+								"inertia":kmeans_clusterer.inertia_
+							}
 
 		print_dict(self.kmeans_results)
 
-	def perform_hierarchial(self,no_clusters,params={}):
-		hierarchial_clusterer=AgglomerativeClustering(n_clusters=no_clusters,**params)
-		hierarchial_clusterer.fit(self.data,hdf5_file=self.hdf5_file)
+
+	def perform_hierarchial(self, n_clusters='gap', **kargs):
+		"""Perform Ward's Hierarchial Clustering on the data
+
+		n_clusters ({int, 'gap', 'n_classes'}, default='gap'): number (``int``) of clusters in the data. ``gap`` implies estimate the optimal number of clusters from data using Gap Statistics. ``n_classes`` implies uses number of classes in data as number of clusters.
+		**kargs: Other Keyword arguments (parameters) accepted by object :`sklearn.cluster.AgglomerativeClustering` constructor (Keyword Arguments: affinity, linkage, memory).
 		
-		self.hierarchial_results={"parameters":hierarchial_clusterer.get_params(),"labels":hierarchial_clusterer.labels_,"n_clusters":no_clusters,'clusters':label_cnt_dict(hierarchial_clusterer.labels_)}     
+		Note:
+			'Gap Statistics' may produce inconsistent K (optimal number of cluster) estimation across trials for datasets without clear distinct clusters.
+		
+		See also:
+			* The method :func:`craved.eda.perform_hierarchial` is built upon `scikit-learn's Agglomerative Clustering API`_ (:obj:`sklearn.cluster.AgglomerativeClustering`).
+			* Research Paper : `Estimating the number of clusters in a data set via the gap statistics`_ 
+
+		Examples:
+			Illustration of performing Ward's Agglomerative Hierarchial Clustering on synthetic dataset::
+
+			>>> from craved import eda
+			>>> main = eda.eda()
+
+			>>> # Generate synthetic dataset (with istropic gaussian blobs clusters) using :func:`sklearn.datasets.make_blobs`
+			... from sklearn.datasets import make_blobs
+			>>> data, target = make_blobs(n_samples=100, n_features=2, centers=3)
+
+			>>> # Load the synthetic dataset into the eda object :obj:`main`
+			...	main.load_data(data, target)
+
+			>>> # Perform Agglomerative Hierarchial Clustering on the data
+			... main.perform_hierarchial(n_clusters='gap')
+			info: Data implicilty Standardized (aka Z-Score Normalised) for Hierarchial Clustering
+			< ... some gap statistics (optimal n_clusters estimation) info goes here ... >
+			info: Optimal number of clusters in data, K=3 (as inferred using gap statistics)
+			
+			n_clusters : 3
+			labels : [1 2 2 1 0 2 1 2 1 2 2 2 1 1 2 1 0 2 1 0 1 0 2 0 2 0 2 1 1 2 1 1 2 2 1 1 0
+			 0 2 0 0 0 0 1 0 0 2 2 2 1 1 0 1 0 1 2 1 2 1 2 0 1 0 0 0 2 2 2 0 0 0 1 1 1
+			 0 1 0 0 2 2 0 0 2 1 1 1 2 2 1 0 2 0 1 0 0 1 0 0 1 2]
+			clusters : {0: 34, 1: 34, 2: 32}
+			parameters : {'affinity': 'euclidean', 'connectivity': None, 'pooling_func': <function mean at 0x7f991ff63268>, 'n_clusters': 3, 'memory': None, 'compute_full_tree': 'auto', 'linkage': 'ward'}
+
+		.. _`scikit-learn's Agglomerative Clustering API`: http://scikit-learn.org/stable/modules/generated/sklearn.cluster.AgglomerativeClustering.html
+		.. _`Estimating the number of clusters in a data set via the gap statistics`: http://web.stanford.edu/~hastie/Papers/gap.pdf
+		"""
+
+		if not hasattr(self, 'standard_scaler'):
+			self.standardize_data()
+			print("info: Data implicilty Standardized (aka Z-Score Normalised) for Hierarchial Clustering")
+
+		if isinstance(n_clusters, int):
+			pass
+
+		# Estimate optimal 'number of clusters' (k) from data using gap statistics
+		elif isinstance(n_clusters, str) and n_clusters.casefold()=='gap':
+
+			kmin = 1
+			kmax = min(10, self.n_samples-1)
+			bestKValue = -1
+
+			# TODO: Handle boundary cases
+			while bestKValue < 0 and kmax>kmin:
+				bestKValue = gap_statistics(self.data, kmax=kmax, kmin=kmin, cluster_algorithm=AgglomerativeClustering, **kargs)
+				
+				kmin = kmax+1
+				kmax += min(10, (self.n_samples-1) - kmax)
+
+			if bestKValue < 0:
+				print("error: Gap statistics couldn't estimate the optimal number of clusters in data")
+				sys.exit(1)
+
+			n_clusters = bestKValue
+			print("info: Optimal number of clusters in data, K=%d (as inferred using gap statistics)"%n_clusters)
+
+		# 'number of clusters' to find = 'number of classes' in the labelled dataset
+		elif isinstance(n_clusters, str) and n_clusters.casefold()=='n_classes':
+			if target is not None:
+				if hasattr(self, 'classes_') and self.classes_ is not None:
+					n_clusters, = self.classes_.shape
+				else:
+					n_clusters, = np.unique(self.target).shape
+
+			else:
+				print("error: number of classes in data couldn't be determined due to absence of target class info.")
+				sys.exit(1)
+		
+		else:
+			print("error: invalid argument for parameter 'n_clusters'. Accepted arguments: {int, 'gap', 'n_classes'}")
+			sys.exit(1)
+
+		if self._hdf5_file is not None:
+			try:
+				hierarchial_clusterer = AgglomerativeClustering(n_clusters=n_clusters, hdf5_file=self._hdf5_file, **kargs)
+
+			except TypeError:
+				print("warning: Accompanying package 'sklearn-large' not installed. Cannot write intermediate data structures to HDF5 file.")
+				hierarchial_clusterer = AgglomerativeClustering(n_clusters=n_clusters, **kargs)
+
+		else:
+			hierarchial_clusterer = AgglomerativeClustering(n_clusters=n_clusters, **kargs)
+		
+		try:
+			hierarchial_clusterer.fit(self.data)
+
+		except MemoryError:
+			print("error: Data too large to be processed on this machine. Install accompanying package 'sklearn-large' (if you haven't) and try again ")
+			sys.exit(1)
+		
+		self.hierarchial_results = {
+										"parameters":hierarchial_clusterer.get_params(),
+										"labels":hierarchial_clusterer.labels_,
+										"n_clusters":n_clusters,
+										'clusters':label_cnt_dict(hierarchial_clusterer.labels_)
+									}
 
 		print_dict(self.hierarchial_results)
+
 
 def label_cnt_dict(labels):
 	unique, counts = np.unique(labels, return_counts=True)
@@ -1468,3 +1419,54 @@ def max_classes_nominal(n_samples):
 	
 	else:
 		return  n_samples/100
+
+def gap_statistics(data, kmax=10, kmin=1, B=10, cluster_algorithm=KMeans, **kargs):
+		"""Estimating the number of clusters in a data set via the gap statistics method
+
+		Parameters:
+			data (:obj:`np.ndarray`): the data samples to cluster
+			kmax (int, default=10): the start value of the range of 'K' values to search for the optimal number of clusters
+			kmin (int, default=1): the stop value of the range of 'K' values to search for the optimal number of clusters
+			B (int, default=10): number of reference datasets (uniformly sampled from the box region of original data) used to generate **standard** K v/s log(wk) graph
+			cluster_algorithm (callable, default: :func:`sklearn.cluster.KMeans`): a sklearn (aka scikit-learn) complient 'clusterer' object constructor which accepts ``n_clusters`` (number of clusters) as a parameter.
+			**kargs: other parameters accepted by 'clusterer' object constructor
+		
+		Returns:
+			Optimal number of clusters (k) in data, if k in the range from kmin to kmax. Returns -1 otherwise.
+
+		Note:
+			* The estimated value of 'k' (optimal number of cluster) is prone to change over runs (for data with no distinct blob clusters) due to random reference samples generated by the algorithm.
+			* Data must be standardized (aka Z-Score Normalised) prior to 'k' (optimal number of clusters) value estimation using gap statistics.
+
+		See also:
+			* The Data Science Lab : `Finding the K in K-Means Clustering`_ 
+			* Research Paper : `Estimating the number of clusters in a data set via the gap statistics`_
+		
+		Examples:
+			Illustration of **computing the optimal number of clusters** in data using GAP STATISTICS::
+			
+			>>> from craved import eda
+			
+			>>> # Generate toy datasets (with K=7 isotropic Gaussian blobs) using :func:`sklearn.datasets.make_blobs`
+			... from sklearn.datasets import make_blobs
+			>>> data, target = make_blobs(n_samples=1000, n_features=3, centers=7)
+			
+			>>> # Load data into an eda object
+			... main = eda.eda()
+			>>> main.load_data(data, target)
+
+			>>> # Standardise (Z-Score Normalisation) of features
+			... main.standardize_data()	
+			
+			>>> # Compute best K value in the range from 2 to 10, i.e, K=range(2,11) (default)
+			... bestKValue = eda.gap_statistics(main.data)
+			>>> print("Optimal Number of clusters = %d"%bestKValue)
+			Optimal Number of clusters = 7
+		
+		.. _`Finding the K in K-Means Clustering`: https://datasciencelab.wordpress.com/2013/12/27/finding-the-k-in-k-means-clustering/
+		.. _`Estimating the number of clusters in a data set via the gap statistics`: http://web.stanford.edu/~hastie/Papers/gap.pdf
+		"""
+
+
+		bestKValue = gap.gap_statistics(data, kmax=kmax, kmin=kmin, B=B, cluster_algorithm=cluster_algorithm, **kargs)
+		return bestKValue

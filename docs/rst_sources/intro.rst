@@ -6,7 +6,7 @@ Introduction
 What is Buddi-CRAVeD ?
 ----------------------
 
-**Buddi-CRAVeD** ``(ClusteR Analysis and Validation for largE Datasets)`` is a easy-to-use Cluster Analysis, Visualisation and Validation suite. It draws upon the power of standard `Python3 <https://www.python.org/>`_ APIs for data analysis, machine learning and data visualisation.
+**Buddi-CRAVeD** ``(ClusteR Analysis and Validation for largE Datasets)`` is a easy-to-use Cluster Analysis, Visualisation and Validation suite. It draws upon the power of standard Python3_ APIs for data analysis, machine learning and data visualisation.
 
 The suite extends support for an extensive range of :
 
@@ -14,7 +14,7 @@ The suite extends support for an extensive range of :
 * Internal and External Cluster Validation Indices
 * Methods for visualisation of 2D and 3D Data
 
-The suite along with our **modified versions** of the companion libraries (`scikit-learn <http://scikit-learn.org/stable/>`_, `scipy <https://www.scipy.org/>`_) allows us to push the limits on **"maximum size of datasets for cluster analysis on common desktops and laptops"** posed due low main memory availabilty. This feat is achieved by moving the memory-intensive data structures that cloge the main memory onto `HDF5 <https://support.hdfgroup.org/HDF5/>`_ files that can be put on hard-disks.
+The suite along with our **modified versions** of the companion libraries (scikit-learn_, scipy_) allows us to push the limits on **"maximum size of datasets for cluster analysis on common desktops and laptops"** posed due low main memory availabilty. This feat is achieved by moving the memory-intensive data structures that cloge the main memory onto HDF5_ files that can be put on hard-disks.
 
 Who is it intended for ?
 ------------------------
@@ -24,3 +24,8 @@ Who is it intended for ?
 It also qualifies as a great companion tool to assist **quality research** on *Cluster Validation* and allied domains.
 
 For those "craving" to **do more** (i.e., process larger datasets) with the **limited main memory** of their desktops and laptops, we help you push the boundaries.
+
+.. _Python3: https://www.python.org/
+.. _scikit-learn: http://scikit-learn.org/stable/
+.. _scipy: https://www.scipy.org/
+.. _HDF5: https://support.hdfgroup.org/HDF5/
