@@ -1145,6 +1145,8 @@ class eda:
 			 .. _`Scikit-Learn's KMeans Clustering API`: scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html
 		"""
 		
+		print("info: Performing KMeans Clustering")
+
 		if not hasattr(self, 'standard_scaler'):
 			self.standardize_data()
 			print("info: Data implicilty Standardized (aka Z-Score Normalised) for K-Means Clustering")
@@ -1161,6 +1163,7 @@ class eda:
 
 			# TODO: Handle boundary cases
 			while bestKValue < 0 and kmax>kmin:
+				print("info: searching for optimal number of clusters in range %d to %d"%(kmin, kmax))
 				bestKValue = gap_statistics(self.data, kmax=kmax, kmin=kmin, cluster_algorithm=KMeans, **kargs)
 				
 				kmin = kmax+1
@@ -1175,11 +1178,13 @@ class eda:
 
 		# 'number of clusters' to find = 'number of classes' in the labelled dataset
 		elif isinstance(n_clusters, str) and n_clusters.casefold()=='n_classes':
-			if target is not None:
+			if self.target is not None:
 				if hasattr(self, 'classes_') and self.classes_ is not None:
 					n_clusters, = self.classes_.shape
 				else:
 					n_clusters, = np.unique(self.target).shape
+
+				print("info: number of clusters in data, K=%d (equal to number of classes)"%n_clusters)
 
 			else:
 				print("error: number of classes in data couldn't be determined due to absence of target class info.")
@@ -1246,6 +1251,8 @@ class eda:
 		.. _`scikit-learn's Agglomerative Clustering API`: http://scikit-learn.org/stable/modules/generated/sklearn.cluster.AgglomerativeClustering.html
 		.. _`Estimating the number of clusters in a data set via the gap statistics`: http://web.stanford.edu/~hastie/Papers/gap.pdf
 		"""
+		
+		print("info: Performing Hierarchial Clustering")
 
 		if not hasattr(self, 'standard_scaler'):
 			self.standardize_data()
@@ -1263,6 +1270,7 @@ class eda:
 
 			# TODO: Handle boundary cases
 			while bestKValue < 0 and kmax>kmin:
+				print("info: searching for optimal number of clusters in range %d to %d"%(kmin, kmax))
 				bestKValue = gap_statistics(self.data, kmax=kmax, kmin=kmin, cluster_algorithm=AgglomerativeClustering, **kargs)
 				
 				kmin = kmax+1
@@ -1277,12 +1285,14 @@ class eda:
 
 		# 'number of clusters' to find = 'number of classes' in the labelled dataset
 		elif isinstance(n_clusters, str) and n_clusters.casefold()=='n_classes':
-			if target is not None:
+			if self.target is not None:
 				if hasattr(self, 'classes_') and self.classes_ is not None:
 					n_clusters, = self.classes_.shape
 				else:
 					n_clusters, = np.unique(self.target).shape
 
+				print("info: number of clusters in data, K=%d (equal to number of classes)"%n_clusters)
+				
 			else:
 				print("error: number of classes in data couldn't be determined due to absence of target class info.")
 				sys.exit(1)

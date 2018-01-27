@@ -133,6 +133,12 @@ class internal_indices:
 
 	# internal indices -- start
 
+	def wgss_index(self):
+		return self.WGSS
+
+	def bgss_index(self):
+		return self.BGSS
+
 	def ball_hall_index(self):
 		"""
 		Ball Hall index -- mean, through all the clusters, of their mean dispersion
@@ -192,54 +198,53 @@ class internal_indices:
 		"""
 		return np.trace(np.linalg.inv(self.WG).dot(self.BG))
 
-	def silhouette_score(self, threshold=-1, return_indices=False):
+	def silhouette_score(self):
 		"""Silhouette score (sklearn)
 
 		Reference: [1] http://scikit-learn.org/stable/modules/generated/sklearn.metrics.silhouette_score.html#sklearn.metrics.silhouette_score	
 		"""
 		
 		#Experiments on silhoutte score -- Partitional Algorithms
-		cluster_data_indices = np.empty((self.n_clusters,),dtype='O')
+		# cluster_data_indices = np.empty((self.n_clusters,),dtype='O')
 
-		for cluster_index in range(self.n_clusters):
-			cluster_data_indices[cluster_index] = list(np.where(self.labels==cluster_index))
+		# for cluster_index in range(self.n_clusters):
+		# 	cluster_data_indices[cluster_index] = list(np.where(self.labels==cluster_index))
 
-		silhouette_coefs = np.zeros((self.n_samples,),dtype='d')
-		for data_index in range(self.n_samples):
-			avg_intra_dist = euclidean_distances(self.data[[data_index]],self.data[cluster_data_indices[self.labels[data_index]]])[0]
-			ai = np.sum(avg_intra_dist)/(self.clusters_size[self.labels[data_index]]-1)
+		# silhouette_coefs = np.zeros((self.n_samples,),dtype='d')
+		# for data_index in range(self.n_samples):
+		# 	avg_intra_dist = euclidean_distances(self.data[[data_index]],self.data[cluster_data_indices[self.labels[data_index]]])[0]
+		# 	ai = np.sum(avg_intra_dist)/(self.clusters_size[self.labels[data_index]]-1)
 
-			bi = np.float64('inf')
-			for cluster_index in range(self.n_clusters):
-				if cluster_index == self.labels[data_index]:
-					continue
+		# 	bi = np.float64('inf')
+		# 	for cluster_index in range(self.n_clusters):
+		# 		if cluster_index == self.labels[data_index]:
+		# 			continue
 
-				avg_inter_dist = euclidean_distances(self.data[[data_index]],self.data[cluster_data_indices[cluster_index]])[0]
-				current_bi = np.mean(avg_inter_dist)
+		# 		avg_inter_dist = euclidean_distances(self.data[[data_index]],self.data[cluster_data_indices[cluster_index]])[0]
+		# 		current_bi = np.mean(avg_inter_dist)
 
-				if current_bi < bi:
-					bi = current_bi
+		# 		if current_bi < bi:
+		# 			bi = current_bi
 
-			silhouette_coefs[data_index] = (bi - ai)/max(ai,bi)
+		# 	silhouette_coefs[data_index] = (bi - ai)/max(ai,bi)
 		
-		choosen_indices = list(np.where(silhouette_coefs > threshold))
-		data = self.data[choosen_indices]
+		# choosen_indices = list(np.where(silhouette_coefs > threshold))
+		# data = self.data[choosen_indices]
 
-		cmap = sns.cubehelix_palette(as_cmap=True)
+		# cmap = sns.cubehelix_palette(as_cmap=True)
 
-		f, ax = plt.subplots()
-		points = ax.scatter(data.T[0], data.T[1], c=silhouette_coefs[choosen_indices], s=50, cmap=cmap)
-		f.colorbar(points)
-		plt.show()
+		# f, ax = plt.subplots()
+		# points = ax.scatter(data.T[0], data.T[1], c=silhouette_coefs[choosen_indices], s=50, cmap=cmap)
+		# f.colorbar(points)
+		# plt.show()
 
-		if return_indices:
-			return silhouette_coefs, choosen_indices
+		#if return_indices:
+		#	return silhouette_coefs, choosen_indices
 		
-		return silhouette_coefs
+		#return silhouette_coefs
 		
 		#return np.mean(silhouette_coefs)
-		
-		#return metrics.silhouette_score(self.data,self.labels, metric='euclidean')
+		return metrics.silhouette_score(self.data,self.labels, metric='euclidean')
 
 
 	def calinski_harabaz_score(self) :
@@ -378,11 +383,12 @@ class internal_indices:
 
 		return (self.n_samples-self.n_clusters-1)*(self.WGSS-total_dispersion)/total_dispersion
 
-	def pbm_index(self,p=2):
+	def pbm_index(self):
 		"""Maulik-Bandyopadhyay index (aka. I-index, PBM Index)
 
-		References	:	[1] https://pdfs.semanticscholar.org/9701/405b0d601e169636a2541940a070087acd5b.PDF
+		References	:	[1] https://pdfs.semanticscholar.org/9701/405b0d601e169636a2541940a070087acd5b.pdf
 						[2] Clustering Indices, Bernard Desgraupes (April 2013)
+						[3] ClusterCrit: https://cran.r-project.org/web/packages/clusterCrit/vignettes/clusterCrit.pdf
 
 		Maulik, U., Bandyopadhyay, S.: Performance evaluation of some clustering algorithms and validity indices. IEEE Transactions Pattern Analysis Machine Intelligence 24(12) (2002) 1650–1654
 
@@ -399,7 +405,7 @@ class internal_indices:
 			Ew += euclidean_distance(self.data[data_index],self.clusters_mean[self.labels[data_index]])
 			Et += euclidean_distance(self.data[data_index],self.data_mean)
 
-		return np.power((Et * max_DB)/(self.n_clusters * Ew),p)
+		return np.power((Et * max_DB)/(self.n_clusters * Ew),2)
 
 	def score_function(self):
 		"""Score Function - SF : works good for hyper-speriodal data

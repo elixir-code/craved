@@ -214,7 +214,7 @@ class external_indices:
 		return metrics.adjusted_rand_score(self.class_labels,self.cluster_labels) 
 
 
-	def adjusted_mutual_information(self):
+	def adjusted_mutual_info(self):
 		"""Adjusted Mutual Information score (SKLEARN)
 
 		Reference: http://scikit-learn.org/stable/modules/generated/sklearn.metrics.adjusted_mutual_info_score.html#sklearn.metrics.adjusted_mutual_info_score
@@ -222,7 +222,7 @@ class external_indices:
 		return metrics.adjusted_mutual_info_score(self.class_labels,self.cluster_labels)  
 
 
-	def normalized_mutual_information(self):
+	def normalized_mutual_info(self):
 		"""Normalized Mutual Information score (SKLEARN)
 
 		Reference: http://scikit-learn.org/stable/modules/generated/sklearn.metrics.normalized_mutual_info_score.html#sklearn.metrics.normalized_mutual_info_score
@@ -260,7 +260,7 @@ class external_indices:
 		return metrics.v_measure_score(self.class_labels,self.cluster_labels)  
 
 
-	def jaccard_co_eff(self):
+	def jaccard_coeff(self):
 		"""Jaccard's coefficient
 		References:	Chapter 10 - Bible of clustering
 					Clustering Indices, Bernard Desgraupes (April 2013)

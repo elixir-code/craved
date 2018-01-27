@@ -1,5 +1,64 @@
 #!/usr/bin/env python3
 
+# Note: Strictly don't modify (or reorder) the 'choosen_internal_indices' list (without corresponding changes to :program:`generating_indices.py' script)
+choosen_internal_indices = [
+								'WGSS', 'BGSS',
+
+								'Ball-Hall',
+								'Banfeld-Raftery',
+								'Calinski-Harabasz',
+								
+								'Det-Ratio',
+								'Ksq-DetW',
+								'Log-Det-Ratio',
+								'Log-SS-Ratio',
+								
+								#'Scott-Symons',
+								'Silhouette',
+
+								'Trace-WiB',
+								'C',
+								'Dunn',
+								'Davies-Bouldin',
+								'Ray-Turi',
+								'PBM',
+								'Score'
+							]
+
+# Note: Strictly don't modify (or reorder) the 'choosen_external_indices' list (without corresponding changes to :program:`generating_indices.py' script)
+choosen_external_indices = [
+								'Entropy',
+								'Purity',
+								
+								'Precision',
+								'Recall',
+								'F',
+								'Weighted-F',
+
+								'Folkes-Mallows',
+								'Rand',
+								'Adjusted-Rand',
+
+								'Adjusted-Mutual-Info',
+								'Normalised-Mutual-Info',
+
+								'Homegeneity',
+								'Completeness',
+								'V-Measure',
+
+								'Jaccard',
+								'Hubert Γ̂',
+								'Kulczynski',
+
+								'McNemar',
+								'Phi',
+								'Russel-Rao',
+
+								'Rogers-Tanimoto',
+								'Sokal-Sneath1',
+								'Sokal-Sneath2'
+							]
+
 import sys, os
 
 def main():
@@ -49,16 +108,15 @@ def main():
 
 			print("writing results.csv")
 
-			results_file.write("\"bag name\",")
-			results_file.write("algorithm,")
+			results_file.write("Dataset,\"TimestampID\",#samples,#features,#classes,\"Class Distrn\",\"Nominal Features\",\"Bag Name\",\"Sample Size\",Algorithm,Parameters,#clusters,\"Clust. Distrn\",")
+			for index in choosen_internal_indices:
+				results_file.write("\""+index+"\",")
 
-			for i in range(15):
-				results_file.write('\"Internal {}\",'.format(i+1))
-
-			for i in range(15):
-				results_file.write('\"External {}\",'.format(i+1))
+			for index in choosen_external_indices:
+				results_file.write("\""+index+"\",")
 
 			results_file.write("\n")
+			results_file.close()
 
 	except OSError as err:
 		print("\n{0}".format(err))
