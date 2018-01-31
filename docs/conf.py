@@ -32,9 +32,9 @@
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 
-import sys
-import os
-sys.path.insert(0, os.path.abspath('../'))
+# import sys
+# import os
+# sys.path.insert(0, os.path.abspath('../'))
 
 extensions = ['sphinx.ext.autodoc','sphinx.ext.napoleon','sphinx.ext.todo']
 

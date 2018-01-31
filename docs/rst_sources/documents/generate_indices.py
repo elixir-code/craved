@@ -1,3 +1,5 @@
+""" Script to generate indices from randomly sampled bags of data """
+
 from craved import eda
 from craved import internal_indices
 from craved import external_indices

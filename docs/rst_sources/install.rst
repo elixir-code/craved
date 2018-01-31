@@ -1,9 +1,11 @@
 .. highlight:: console
 
+.. _setup:
+
 Setting up the Environment [#]_
 ===============================
 
-The suite interfaces extensively with some external standard `Python3 <https://docs.python.org/3/>`_ APIs to accomplish its tasks. It is essential that we get these :download:`dependencies <docs/requirements.txt>` [#]_ up and running, before we can get started.
+The suite interfaces extensively with some external standard `Python3 <https://docs.python.org/3/>`_ APIs to accomplish its tasks. It is essential that we get these :download:`dependencies <documents/requirements.txt>` [#]_ up and running, before we can get started.
 
 Installing the Dependencies
 ---------------------------
