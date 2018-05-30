@@ -7,7 +7,7 @@ def readme():
 
 setup(
 	name = "craved", #name of the package
-	version = "0.1a1", #version 0.1 alpha version 1
+	version = "0.2a1", #version 0.2 alpha version 1
 	packages = find_packages(), # automatically find packeges -- ['gap','sample']
 
 	classifiers = [
