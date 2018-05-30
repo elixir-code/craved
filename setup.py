@@ -41,7 +41,7 @@ setup(
 	keywords = 'cluster analysis validation visualisation internal external indices',
 
 	#script 'craved-home' sets up directory structure to store intermediate files
-	scripts=[pjoin('bin,craved-warehouse')],
+	scripts=[pjoin('bin/craved-warehouse')],
 
 	include_package_data=True,
 )
