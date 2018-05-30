@@ -29,8 +29,8 @@ setup(
 		'numpy', 
 	],
 
-	author = "R Mukesh",
-	author_email = "reghu.mukesh@gmail.com",
+	author = "R Mukesh,NitinShravan",
+	author_email = "reghu.mukesh@gmail.com,ntnshrav@gmail.com",
 	
 	description = "Buddi-CRAVeD",
 	long_description = readme(),
@@ -41,7 +41,7 @@ setup(
 	keywords = 'cluster analysis validation visualisation internal external indices',
 
 	#script 'craved-home' sets up directory structure to store intermediate files
-	scripts=['bin/craved-warehouse'],
+	scripts=[pjoin('bin,craved-warehouse')],
 
 	include_package_data=True,
 )

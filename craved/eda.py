@@ -31,6 +31,10 @@ from sklearn.cluster import SpectralClustering
 from sklearn.cluster import AgglomerativeClustering
 from math import pow,floor,ceil
 
+
+# For stratified sampling
+from sklearn.model_selection import StratifiedShuffleSplit
+
 from . import gap
 
 import pandas as pd
@@ -1097,6 +1101,88 @@ class eda:
 
 		pickle.dump(metadata, open("metadata.p", "xb"))
 
+	def stratified_sampling(self, bag_name, sample_size, n_iterations=10, file_prefix=None, location=__warehouse__+"BAGS/" if __warehouse__ is not None else None):
+
+		# Resolving LOCATION for bagged samples
+		if location is not None:
+			
+			location = os.path.abspath(os.path.expanduser(location))
+
+			try:
+				os.chdir(location)
+
+			except FileNotFoundError:	
+				print("error: Failed to resolve location '%s'"%location)
+				sys.exit(1)
+
+		else:
+			print("error: Buddi-CRAVeD 'warehouse' not setup. Specify an user path for sampled data bags.")
+			sys.exit(1)
+
+		try:
+			os.mkdir(bag_name)
+			os.chdir(bag_name)
+
+		except OSError as err:
+			print("error: Unable to write sampled data bags to disk.\n{0}".format(err))
+			sys.exit(1)
+
+
+		# Validating the sample size parameter
+		if isinstance(sample_size, int) and (sample_size>0 and sample_size<=self.n_samples):
+			pass
+
+		elif isinstance(sample_size, float) and (sample_size>0.0 and sample_size<=1.0):
+			pass
+
+		else:
+			print("error: Invalid sampling size encountered")
+			sys.exit(1)
+		
+
+		if file_prefix is None:
+			file_prefix = ''
+
+		else:
+			file_prefix = file_prefix + '_'
+
+
+		if self.target is not None:
+
+			sss = StratifiedShuffleSplit(n_splits=n_iterations, test_size=sample_size)
+			sss.get_n_splits(self.data, self.target)
+			bag_number = 0
+
+			for train_index, test_index in sss.split(self.data, self.target):
+
+				sampled_data = dict.fromkeys(['data', 'target'])
+
+				sampled_data['data'], sampled_data['target'] = self.data[test_index], self.target[test_index]
+				pickle.dump(sampled_data, open(file_prefix + "bag"+str(bag_number+1)+".p","xb"))
+				bag_number = bag_number + 1
+				del sampled_data
+
+			# Metadata of data
+			from time import time
+			metadata = 	{
+							'timestamp':time(), # Uniquely identifies baggings (with probability ~= 1)
+							'classes':label_cnt_dict(self.target) if self.target is not None else None,
+							
+							'n_samples':self.n_samples, # Not inferrable from classes, if target=None
+							'n_features':self.n_features,
+
+							'column_names':self.columns_,
+							'column_categories':self.columns_categories_ if hasattr(self, 'columns_categories_') else None
+						}
+
+			pickle.dump(metadata, open("metadata.p", "xb"))
+
+		else:
+			print("error: stratified sampling failed due to absence of target attribute")
+			sys.exit(1)
+
+
+
 
 	def perform_kmeans(self, n_clusters='gap', **kargs):
 		"""Perform K-Means Clustering on the data
@@ -1175,6 +1261,10 @@ class eda:
 
 			n_clusters = bestKValue
 			print("info: Optimal number of clusters in data, K=%d (as inferred using gap statistics)"%n_clusters)
+			if(n_clusters < 2 ):
+				print("info:gap statistics returned optimal clusters =1 ,FORCING n_clusters = 2 ")
+				n_clusters = 2
+			
 
 		# 'number of clusters' to find = 'number of classes' in the labelled dataset
 		elif isinstance(n_clusters, str) and n_clusters.casefold()=='n_classes':
@@ -1282,6 +1372,10 @@ class eda:
 
 			n_clusters = bestKValue
 			print("info: Optimal number of clusters in data, K=%d (as inferred using gap statistics)"%n_clusters)
+			if(n_clusters < 2 ):
+				print("info:gap statistics returned optimal clusters =1 ,FORCING n_clusters = 2 ")
+				n_clusters = 2
+			
 
 		# 'number of clusters' to find = 'number of classes' in the labelled dataset
 		elif isinstance(n_clusters, str) and n_clusters.casefold()=='n_classes':
