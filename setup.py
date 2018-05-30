@@ -1,5 +1,5 @@
 from setuptools import setup, find_packages
-
+from os.path import join as pjoin
 #read the README.rst file for use as long description
 def readme():
 	with open('README.rst') as f:
