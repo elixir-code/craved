@@ -78,6 +78,7 @@ class internal_indices:
 		self.clusters_mean = np.zeros((self.n_clusters,self.n_features))
 		self.clusters_size = np.zeros(self.n_clusters)
 
+		self.insignificant = 1/pow(10,20)
 		for cluster_label in range(self.n_clusters):
 			#if cluster_label >=0  (to avoid noise)
 			cluster_i_pts = (self.labels==cluster_label)
@@ -111,6 +112,17 @@ class internal_indices:
 			self.WG_clusters[cluster_label] = total_scatter_matrix(self.data[self.labels==cluster_label]) 
 			self.WGSS_clusters[cluster_label] = np.trace(self.WG_clusters[cluster_label])
 
+		self.WGSS_clusters_non_zeros_indices = [i for i, e in enumerate(self.WGSS_clusters) if e != 0]
+
+		self.WGSS_clusters_non_zeros_indices_size = len(self.WGSS_clusters_non_zeros_indices)
+		
+		#print(self.WGSS_clusters_non_zeros_indices_size)
+		self.WGSS_clusters_non_zeros_BR_index = np.zeros(self.WGSS_clusters_non_zeros_indices_size,dtype=np.float64)
+		self.clusters_size_BR_index = np.zeros(self.WGSS_clusters_non_zeros_indices_size,dtype=np.float64)
+		for cluster_index in range(self.WGSS_clusters_non_zeros_indices_size):
+			self.WGSS_clusters_non_zeros_BR_index[cluster_index] = self.WGSS_clusters[self.WGSS_clusters_non_zeros_indices[cluster_index]]
+			self.clusters_size_BR_index[cluster_index] = self.clusters_size[self.WGSS_clusters_non_zeros_indices[cluster_index]]
+
 			#compute between-cluster matrix
 			mean_vec = self.clusters_mean[cluster_label].reshape((self.n_features,1))
 			overall_mean = self.data_mean.reshape((self.n_features,1))
@@ -119,6 +131,7 @@ class internal_indices:
 			#self.BG = self.BG + self.clusters_size[i]*np.dot(cluster_data_mean_diff.T,cluster_data_mean_diff)
 
 		self.WG = np.sum(self.WG_clusters,axis=0)
+
 		#print(self.WG)
 
 		self.WGSS = np.trace(self.WG)
@@ -130,6 +143,8 @@ class internal_indices:
 
 		self.det_WG = np.linalg.det(self.WG)
 		self.det_T = np.linalg.det(self.T) 
+
+
 
 	# internal indices -- start
 
@@ -164,20 +179,33 @@ class internal_indices:
 		
 		[2] Appropriate for hyperspherical clusters (may be of different sizes)
 		"""
-		br_index = np.sum(self.clusters_size*np.log(self.WGSS_clusters/self.clusters_size))
+		#br_index = np.sum(self.clusters_size*np.log(self.WGSS_clusters/self.clusters_size))
+		br_index = np.sum(self.clusters_size_BR_index*np.log(self.WGSS_clusters_non_zeros_BR_index/self.clusters_size_BR_index))
 		return br_index
 
 	def  det_ratio_index(self):
 		"""The Determinant Ratio 
 	            Det_R =det(T)/det(WG).
 	    """
-		return self.det_T/self.det_WG
+		if(self.det_WG <= 0 or self.det_T <= 0):
+			print("replacing with insignificant")
+			return self.insignificant
+		else:
+			return self.det_T/self.det_WG
 
 	def ksq_detw_index(self):
 		return self.n_clusters*self.n_clusters*self.det_WG
 
+	
 	def log_det_ratio_index(self):
-		return self.n_samples * log(self.det_T/self.det_WG)
+		if(self.det_WG <= 0 or self.det_T <= 0):
+			print("replacing with insignificant")
+			return self.insignificant
+		else:
+			#print("------------T and WG > 0 ------------------")
+			#print(self.det_T)
+			#print(self.det_WG)
+			return self.n_samples * log(self.det_T/self.det_WG)
 
 	def log_ss_ratio_index(self):
 		return log(self.BGSS/self.WGSS)
