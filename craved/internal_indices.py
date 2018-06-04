@@ -224,7 +224,11 @@ class internal_indices:
 		"""
 		Trace WiB index -- Maximise (BG/WG), i.e., maximise BG and minimise WG
 		"""
-		return np.trace(np.linalg.inv(self.WG).dot(self.BG))
+		if(self.det_WG <= 0 ):
+			print("replacing with insignificant")
+			return self.insignificant
+		else:
+			return np.trace(np.linalg.inv(self.WG).dot(self.BG))
 
 	def silhouette_score(self):
 		"""Silhouette score (sklearn)
